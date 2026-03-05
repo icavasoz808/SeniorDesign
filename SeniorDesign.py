@@ -1,10 +1,25 @@
 import tkinter as tk
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
 import os
 import pandas as pd
 
-TEMPLATE_FILE = "protocol_template.py"
-OUTPUT_FILE = "FillBot_Output_File.py"
+# Template files for different scripts
+TEMPLATE_FILES = {
+    "Script 1": "protocol_template.py",
+    "Script 2": "protocol_template_2.py",
+    "Script 3": "protocol_template_3.py"
+}
+
+# Output files for each script
+OUTPUT_FILES = {
+    "Script 1": "FillBot_Output_File_1.py",
+    "Script 2": "FillBot_Output_File_2.py",
+    "Script 3": "FillBot_Output_File_3.py"
+}
+
+
+# Store selected scripts
+selected_scripts = set()
 
 
 # ----------------- Functions -----------------
@@ -148,6 +163,10 @@ def generate_protocol():
         print("No data available!")
         return
 
+    if not selected_scripts:
+        messagebox.showwarning("No Selection", "Please select at least one script!")
+        return
+
     try:
         combined_data = root.combined_data
         wells = root.wells
@@ -158,28 +177,61 @@ def generate_protocol():
         vol_eppendorf = root.vol_eppendorf
         vol_aqueous = root.vol_aqueous
 
-        with open(TEMPLATE_FILE, "r", encoding="utf-8") as f:
-            template = f.read()
+        # Generate protocol for each selected script
+        for script_name in selected_scripts:
+            template_file = TEMPLATE_FILES[script_name]
+            output_file = OUTPUT_FILES[script_name]
+            
+            # Check if template file exists
+            if not os.path.exists(template_file):
+                messagebox.showerror("Error", f"Template file not found: {template_file}")
+                print(f"Template file not found: {template_file}")
+                continue
 
-        new_protocol = (
-        template
-        .replace("{{COMBINED_DATA}}", str(combined_data))
-        .replace("{{WELLS}}", str(wells))
-        .replace("{{SAMPLE_IDS}}", str(sample_ids))
-        .replace("{{LOCATION_384}}", str(location_384))
-        .replace("{{VOL_384}}", str(vol_384))
-        .replace("{{LOCATION_EPPENDORF}}", str(location_eppendorf))
-        .replace("{{VOL_EPPENDORF}}", str(vol_eppendorf))
-        .replace("{{VOL_AQUEOUS}}", str(vol_aqueous)))
+            with open(template_file, "r", encoding="utf-8") as f:
+                template = f.read()
 
-        with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-            f.write(new_protocol)
+            new_protocol = (
+                template
+                .replace("{{COMBINED_DATA}}", str(combined_data))
+                .replace("{{WELLS}}", str(wells))
+                .replace("{{SAMPLE_IDS}}", str(sample_ids))
+                .replace("{{LOCATION_384}}", str(location_384))
+                .replace("{{VOL_384}}", str(vol_384))
+                .replace("{{LOCATION_EPPENDORF}}", str(location_eppendorf))
+                .replace("{{VOL_EPPENDORF}}", str(vol_eppendorf))
+                .replace("{{VOL_AQUEOUS}}", str(vol_aqueous)))
 
-        print("Protocol generated!")
-        print("Saved as:", OUTPUT_FILE)
+            with open(output_file, "w", encoding="utf-8") as f:
+                f.write(new_protocol)
+
+            print(f"Protocol generated for {script_name}!")
+            print(f"Saved as: {output_file}")
+
+        messagebox.showinfo("Success", f"Protocols generated for {len(selected_scripts)} script(s)!")
 
     except Exception as e:
+        messagebox.showerror("Error", f"Generation error: {e}")
         print("Generation error:", e)
+
+
+def toggle_script_1():
+    """Generate for Script 1 only"""
+    selected_scripts.clear()
+    selected_scripts.add("Script 1")
+    button_script_1.config(relief="sunken", bg="lightgreen")
+    button_scripts_23.config(relief="raised", bg="SystemButtonFace")
+    generate_protocol()
+
+
+def toggle_scripts_2_3():
+    """Generate for Scripts 2 and 3"""
+    selected_scripts.clear()
+    selected_scripts.add("Script 2")
+    selected_scripts.add("Script 3")
+    button_script_1.config(relief="raised", bg="SystemButtonFace")
+    button_scripts_23.config(relief="sunken", bg="lightblue")
+    generate_protocol()
 
 
 
@@ -198,10 +250,35 @@ tk.Button(root, text="Read CSV", command=read_csv).pack()
 plate_frame = tk.Frame(root)
 plate_frame.pack(pady=10)
 
+# Script selection buttons
+tk.Label(root, text="Select Script(s) to Generate:", font=("Arial", 10, "bold")).pack(pady=10)
+
+button_frame = tk.Frame(root)
+button_frame.pack()
+
+button_script_1 = tk.Button(
+    button_frame,
+    text="Generate One Script",
+    command=toggle_script_1,
+    width=25,
+    bg="SystemButtonFace"
+)
+button_script_1.pack(side="left", padx=10)
+
+button_scripts_23 = tk.Button(
+    button_frame,
+    text="Generate Scripts in Two Parts",
+    command=toggle_scripts_2_3,
+    width=25,
+    bg="SystemButtonFace"
+)
+button_scripts_23.pack(side="left", padx=10)
+
 next_button = tk.Button(
     root,
-    text="Next → Generate Opentrons Protocol",
-    command=generate_protocol
+    text="Close",
+    command=root.quit
 )
+next_button.pack(pady=10)
 
 root.mainloop()
