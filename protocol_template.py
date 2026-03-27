@@ -1,4 +1,4 @@
-from opentrons import protocol_api
+from opentrons import protocol_api, types
 
 metadata = {
     "protocolName": "Auto Generated FillBot Protocol",
@@ -16,10 +16,10 @@ def run(protocol: protocol_api.ProtocolContext):
         "nest_1_reservoir_195ml", "6"
     )
 
-    tiprack_20 = protocol.load_labware(
-        "opentrons_96_tiprack_20ul", "4"
+    tiprack_300 = protocol.load_labware(
+        "opentrons_96_tiprack_300ul", "4"
     )
-    
+
     tiprack_1000 = protocol.load_labware(
         "opentrons_96_tiprack_1000ul", "1"
     )
@@ -37,16 +37,23 @@ def run(protocol: protocol_api.ProtocolContext):
         "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap", "9"
     )
 
+
+    
     pipette_20 = protocol.load_instrument(
         "p20_single_gen2",
         "left",
-        tip_racks=[tiprack_20]
+        tip_racks=[tiprack_300]
     )
+
     pipette_1000 = protocol.load_instrument(
         "p1000_single_gen2",
         "right",
         tip_racks=[tiprack_1000]
     )
+    
+    # Set reduced movement speeds
+    pipette_20.default_speed = 10
+    pipette_1000.default_speed = 150
     # ← injected automatically
     combined_data = {{COMBINED_DATA}}
     wells = {{WELLS}}
@@ -56,6 +63,14 @@ def run(protocol: protocol_api.ProtocolContext):
     location_eppendorf = {{LOCATION_EPPENDORF}}
     vol_eppendorf = {{VOL_EPPENDORF}}
     vol_aqueous = {{VOL_AQUEOUS}}
+
+    # Offsets for p1000 NMR rack substeps
+   
+    p1000_nmr_offsets = {
+        "mix": {"x": 0, "y": 0, "z": 20},
+        "aspirate": {"x": 0, "y": 0, "z": 20},
+        "dispense": {"x": 0, "y": 0, "z": 0},
+    }
 
     protocol.comment(f"Wells: {wells}")
     protocol.comment(f"Sample IDs: {sample_ids}")
@@ -68,33 +83,42 @@ def run(protocol: protocol_api.ProtocolContext):
 
 
     for i, well in enumerate(wells):
-        
-        #DMSO Transfer
-        pipette_20.pick_up_tip()
-        pipette_20.aspirate(float(vol_384[i]), DMSO_plate.wells_by_name()[location_384[i]])
-        pipette_20.dispense(float(vol_384[i]), mix_plate.wells_by_name()[well])
-        pipette_20.drop_tip()
+       
 
-        #Buffer Transfer
-        pipette_1000.aspirate(float(vol_aqueous[i]), aqueous_reservoir.wells()[0])
-        pipette_1000.dispense(float(vol_aqueous[i]), mix_plate.wells_by_name()[well])
-        pipette_1000.mix(3, 100, mix_plate.wells_by_name()[well])
         
-        
-        #Eppendorf Transfer
-        pipette_20.pick_up_tip()
-        vol_epp = float(vol_eppendorf[i])
-        while vol_epp > 0:
-            transfer_vol = min(vol_epp, 20)
-            pipette_20.aspirate(transfer_vol, eppendorf_plate[location_eppendorf[i]])
-            pipette_20.dispense(transfer_vol, mix_plate.wells_by_name()[well])
-            vol_epp -= transfer_vol
-        pipette_20.drop_tip()
-
         #Moving to NMR rack
-        pipette_1000.mix(3, 100, mix_plate.wells_by_name()[well])
-        pipette_1000.aspirate(100, mix_plate.wells_by_name()[well])
-        pipette_1000.dispense(100, NMR_rack.wells_by_name()[well])
+        source_well = mix_plate.wells_by_name()[well]
+        dest_well = NMR_rack.wells_by_name()[well]
+
+        mix_loc = source_well.center().move(
+            types.Point(
+                x=p1000_nmr_offsets["mix"]["x"],
+                y=p1000_nmr_offsets["mix"]["y"],
+                z=p1000_nmr_offsets["mix"]["z"],
+            )
+        )
+
+        aspirate_loc = source_well.center().move(
+            types.Point(
+                x=p1000_nmr_offsets["aspirate"]["x"],
+                y=p1000_nmr_offsets["aspirate"]["y"],
+                z=p1000_nmr_offsets["aspirate"]["z"],
+            )
+        )
+
+        dispense_loc = dest_well.center().move(
+            types.Point(
+                x=p1000_nmr_offsets["dispense"]["x"],
+                y=p1000_nmr_offsets["dispense"]["y"],
+                z=p1000_nmr_offsets["dispense"]["z"],
+            )
+        )
+
+        pipette_1000.blow_out(aspirate_loc)
+        pipette_1000.mix(3, 100, mix_loc)
+        pipette_1000.aspirate(500, aspirate_loc)
+        pipette_1000.dispense(500, dispense_loc)
+        pipette_1000.blow_out(dispense_loc)
 
     # Drop p1000 tip after all transfers complete
     pipette_1000.drop_tip()
