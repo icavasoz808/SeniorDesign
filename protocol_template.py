@@ -523,7 +523,7 @@ def run(protocol: protocol_api.ProtocolContext):
             types.Point(
                 x=p1000_nmr_offsets["aspirate"]["x"],
                 y=p1000_nmr_offsets["aspirate"]["y"],
-                z=p1000_nmr_offsets["aspirate"]["z"],
+                z=p1000_nmr_offsets["aspirate"]["z"] + 30,
             )
         )
 
@@ -531,10 +531,26 @@ def run(protocol: protocol_api.ProtocolContext):
             types.Point(
                 x=p1000_nmr_offsets["dispense"]["x"],
                 y=p1000_nmr_offsets["dispense"]["y"],
-                z=p1000_nmr_offsets["dispense"]["z"] - NMR_Rack_Height - z_needle_move,
+                z=p1000_nmr_offsets["dispense"]["z"] - NMR_Rack_Height - 55,
             )
         )
 
+        dispense_loc_2 = dest_well.center().move(
+            types.Point(
+                x=p1000_nmr_offsets["dispense"]["x"],
+                y=p1000_nmr_offsets["dispense"]["y"],
+                z=p1000_nmr_offsets["dispense"]["z"] - NMR_Rack_Height - 43,
+            )
+        )
+
+        blowout_loc = dest_well.center().move(
+            types.Point(
+                x=p1000_nmr_offsets["dispense"]["x"],
+                y=p1000_nmr_offsets["dispense"]["y"],
+                z=p1000_nmr_offsets["dispense"]["z"] - NMR_Rack_Height - 10,
+            )
+        )
+        
         needle_move = dest_well.center().move(
             types.Point(
                 x=p1000_nmr_offsets["mix"]["x"],
@@ -549,8 +565,13 @@ def run(protocol: protocol_api.ProtocolContext):
         transfer_to_tube_ul = float(vol_to_tube[i])
         pipette_1000.aspirate(transfer_to_tube_ul, aspirate_loc)
         pipette_1000.move_to(needle_move)
-        pipette_1000.dispense(transfer_to_tube_ul, dispense_loc)
-        pipette_1000.blow_out(dispense_loc)
+        protocol.pause("Align rack with NMR Needle")
+        pipette_1000.dispense(transfer_to_tube_ul/2, dispense_loc)
+        ptpette_1000.move_to(dispense_loc_2, speed=10)
+        pipette_1000.dispense(transfer_to_tube_ul/2, dispense_loc_2)
+        pipette_1000.move_to(blowout_loc, speed=10)
+        pipette_1000.blow_out(blowout_loc)
+        pipette_1000.move_to(needle_move)
         pipette_1000.flow_rate.aspirate += 30   
         pipette_1000.flow_rate.dispense += 30
  
